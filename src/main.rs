@@ -1,7 +1,7 @@
 use std::env;
 
 mod scanner;
-use scanner::{Color, scan_ip, colorize, is_ip_v4, write_output_to_file};
+use scanner::{Color, scan_ip, colorize, is_ip_v4, write_output_to_file, arp::discover_devices, arp::list_interfaces};
 
 
 fn print_usage(program_name: &str, options: Vec<VDOption>) {
@@ -111,6 +111,24 @@ fn main() {
         hide: false,
         help: "Number of threads for the scan".to_string(),
     });
+    options.push(VDOption {
+        name: "list-interfaces".to_string(),
+        enabled: false,
+        value: "".to_string(),
+        has_arg: false,
+        aliases: vec!["-li".to_string(), "--list-interfaces".to_string()],
+        hide: false,
+        help: "List available network interfaces".to_string(),
+    });
+    options.push(VDOption {
+        name: "arp".to_string(),
+        enabled: false,
+        value: "".to_string(),
+        has_arg: false,
+        aliases: vec!["-a".to_string(), "--arp".to_string()],
+        hide: false,
+        help: "Discover devices on the network".to_string(),
+    });
 
     let args = env::args().collect::<Vec<String>>();
 
@@ -172,6 +190,21 @@ fn main() {
         }
         panic!("Option not found");
     };
+
+    if get_option("list-interfaces").enabled {
+        println!("Available network interfaces:");
+        let interfaces = list_interfaces();
+        let mut i = 0;
+        for interface in interfaces {
+            println!("[{}]", i);
+            println!("|- MAC: {}", interface.mac.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(":"));
+            println!("|- IPs: {}", interface.ips.iter().map(|ip| ip.to_string()).collect::<Vec<_>>().join(", "));
+            println!("|- {}", interface.description);
+            println!();
+            i += 1;
+        }
+        return;
+    }
 
     if !get_option("target_ip").enabled {
         println!("{}", colorize("[X] Target IP is required\n", Color::Red));
