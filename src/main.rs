@@ -1,6 +1,7 @@
 use std::env;
 
 mod scanner;
+use pnet::{datalink::NetworkInterface, packet::dns::DnsTypes::NULL};
 use scanner::{Color, scan_ip, colorize, is_ip_v4, write_output_to_file, arp::discover_devices, arp::list_interfaces};
 
 
@@ -121,6 +122,15 @@ fn main() {
         help: "List available network interfaces".to_string(),
     });
     options.push(VDOption {
+        name: "interface".to_string(),
+        enabled: false,
+        value: "".to_string(),
+        has_arg: true,
+        aliases: vec!["-i".to_string(), "--interface".to_string()],
+        hide: false,
+        help: "Specify the index or name of the interface to use (--list-interface or -li to get the available interfaces)".to_string()
+    });
+    options.push(VDOption {
         name: "arp".to_string(),
         enabled: false,
         value: "".to_string(),
@@ -190,13 +200,14 @@ fn main() {
         }
         panic!("Option not found");
     };
-
+    
     if get_option("list-interfaces").enabled {
         println!("Available network interfaces:");
         let interfaces = list_interfaces();
         let mut i = 0;
         for interface in interfaces {
             println!("[{}]", i);
+            println!("|- Name: {}", interface.name);
             println!("|- MAC: {}", interface.mac.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(":"));
             println!("|- IPs: {}", interface.ips.iter().map(|ip| ip.to_string()).collect::<Vec<_>>().join(", "));
             println!("|- {}", interface.description);
@@ -204,6 +215,38 @@ fn main() {
             i += 1;
         }
         return;
+    }
+
+    if get_option("arp").enabled {
+        if (!get_option("interface").enabled) {
+            println!("You need to specify an interface (use -li to list interfaces)");
+            return 
+        }
+
+        let interfaces: Vec<NetworkInterface> = list_interfaces();
+        let mut selected_interface: Option<NetworkInterface>; 
+        if get_option("interface").value.parse::<u16>().is_ok() {
+            let int_index = get_option("interface").value.parse::<i32>().try_into().unwrap();
+            if (interfaces.len() > int_index || interfaces.len() < int_index) {
+                println!("Invalid interface index : {}", get_option("interface").value);
+                return
+            }
+
+            selected_interface = Some(interfaces[int_index]);
+        }
+        else {
+            for intfc in interfaces {
+                if intfc.name == get_option("interface").value {
+                    interfaces_selected = Some(intfc);
+                }
+            }
+            if !Some(interfaces_selected) {
+                println!("No interface found for : {}", get_option("interface").value);
+            }
+        }
+
+        println!("Interface selected : {}", Some(interface).name);
+        return
     }
 
     if !get_option("target_ip").enabled {
