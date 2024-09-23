@@ -2,11 +2,12 @@ use std::env;
 
 mod scanner;
 use pnet::{datalink::NetworkInterface, packet::dns::DnsTypes::NULL};
-use scanner::{Color, scan_ip, colorize, is_ip_v4, write_output_to_file, arp::discover_devices, arp::list_interfaces};
-
+use scanner::{
+    arp::discover_devices, arp::list_interfaces, colorize, is_ip_v4, scan_ip, write_output_to_file,
+    Color,
+};
 
 fn print_usage(program_name: &str, options: Vec<VDOption>) {
-
     let mut usage = format!(
         "Usage: \n{} [options] target_ip\n\nOptions:\n",
         program_name
@@ -53,7 +54,6 @@ fn motd() {
     );
 }
 
-
 struct VDOption {
     name: String,
     enabled: bool,
@@ -63,7 +63,6 @@ struct VDOption {
     hide: bool,
     help: String,
 }
-
 
 fn main() {
     let mut options: Vec<VDOption> = Vec::new();
@@ -200,7 +199,7 @@ fn main() {
         }
         panic!("Option not found");
     };
-    
+
     if get_option("list-interfaces").enabled {
         println!("Available network interfaces:");
         let interfaces = list_interfaces();
@@ -208,8 +207,24 @@ fn main() {
         for interface in interfaces {
             println!("[{}]", i);
             println!("|- Name: {}", interface.name);
-            println!("|- MAC: {}", interface.mac.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(":"));
-            println!("|- IPs: {}", interface.ips.iter().map(|ip| ip.to_string()).collect::<Vec<_>>().join(", "));
+            println!(
+                "|- MAC: {}",
+                interface
+                    .mac
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(":")
+            );
+            println!(
+                "|- IPs: {}",
+                interface
+                    .ips
+                    .iter()
+                    .map(|ip| ip.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
             println!("|- {}", interface.description);
             println!();
             i += 1;
@@ -220,33 +235,36 @@ fn main() {
     if get_option("arp").enabled {
         if (!get_option("interface").enabled) {
             println!("You need to specify an interface (use -li to list interfaces)");
-            return 
+            return;
         }
 
         let interfaces: Vec<NetworkInterface> = list_interfaces();
-        let mut selected_interface: Option<NetworkInterface>; 
+        let mut selected_interface: Option<NetworkInterface> = None;
         if get_option("interface").value.parse::<u16>().is_ok() {
-            let int_index = get_option("interface").value.parse::<i32>().try_into().unwrap();
+            let int_index = get_option("interface").value.parse::<usize>().unwrap();
             if (interfaces.len() > int_index || interfaces.len() < int_index) {
-                println!("Invalid interface index : {}", get_option("interface").value);
-                return
+                println!(
+                    "Invalid interface index : {}",
+                    get_option("interface").value
+                );
+                return;
             }
 
-            selected_interface = Some(interfaces[int_index]);
-        }
-        else {
+            selected_interface = Some(interfaces[int_index].clone());
+        } else {
             for intfc in interfaces {
                 if intfc.name == get_option("interface").value {
-                    interfaces_selected = Some(intfc);
+                    selected_interface = Some(intfc);
                 }
             }
-            if !Some(interfaces_selected) {
+            if selected_interface.is_none() {
                 println!("No interface found for : {}", get_option("interface").value);
+            } else {
+                println!("Interface selected : {:?}", Some(selected_interface));
             }
         }
 
-        println!("Interface selected : {}", Some(interface).name);
-        return
+        return;
     }
 
     if !get_option("target_ip").enabled {
@@ -295,5 +313,4 @@ fn main() {
             colorize(&get_option("output").value, Color::Cyan)
         );
     }
-
 }
