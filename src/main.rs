@@ -233,7 +233,7 @@ fn main() {
     }
 
     if get_option("arp").enabled {
-        if (!get_option("interface").enabled) {
+        if !get_option("interface").enabled {
             println!("You need to specify an interface (use -li to list interfaces)");
             return;
         }
@@ -242,12 +242,11 @@ fn main() {
         let mut selected_interface: Option<NetworkInterface> = None;
         if get_option("interface").value.parse::<u16>().is_ok() {
             let int_index = get_option("interface").value.parse::<usize>().unwrap();
-            if (interfaces.len() > int_index || interfaces.len() < int_index) {
+            if interfaces.len() > int_index || interfaces.len() < int_index {
                 println!(
                     "Invalid interface index : {}",
                     get_option("interface").value
                 );
-                return;
             }
 
             selected_interface = Some(interfaces[int_index].clone());
@@ -257,12 +256,18 @@ fn main() {
                     selected_interface = Some(intfc);
                 }
             }
-            if selected_interface.is_none() {
-                println!("No interface found for : {}", get_option("interface").value);
-            } else {
-                println!("Interface selected : {:?}", Some(selected_interface));
-            }
         }
+        if selected_interface.is_none() {
+            println!("No interface found for : {}", get_option("interface").value);
+            return
+        }
+
+        println!(
+            "Interface selected : {}",
+            selected_interface.clone().unwrap().name
+        );
+
+        let devices = discover_devices(selected_interface.clone().unwrap(), selected_interface.unwrap().mac.unwrap());
 
         return;
     }

@@ -2,26 +2,19 @@ use pnet::datalink::NetworkInterface;
 use pnet::datalink::{self, Channel::Ethernet};
 use pnet::packet::arp::{ArpHardwareTypes, ArpOperations, ArpPacket, MutableArpPacket};
 use pnet::packet::ethernet::{EtherTypes, EthernetPacket, MutableEthernetPacket};
-use pnet::packet::{Packet, MutablePacket};
+use pnet::packet::{MutablePacket, Packet};
 use pnet::util::MacAddr;
-use std::net::{Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr};
 use std::thread;
 use std::time::Duration;
 
 // A function to create and send ARP requests
 fn send_arp_request(
-    interface_name: &str,
+    interface: NetworkInterface,
     target_ip: Ipv4Addr,
     source_ip: Ipv4Addr,
     source_mac: MacAddr,
 ) {
-    // Find the network interface
-    let interfaces = datalink::interfaces();
-    let interface = interfaces
-        .into_iter()
-        .find(|iface| iface.name == interface_name)
-        .expect("Failed to find the interface.");
-
     let (mut tx, mut rx) = match datalink::channel(&interface, Default::default()) {
         Ok(Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unhandled channel type"),
@@ -75,18 +68,29 @@ fn send_arp_request(
     }
 }
 
-pub fn discover_devices(interface_name: &str, target_ip: Ipv4Addr, source_ip: Ipv4Addr, source_mac: MacAddr) {
-    let interface_name = "eth0";
+pub fn discover_devices(interface: NetworkInterface, source_mac: MacAddr) {
+    let source_ip = match interface.ips[0].ip() {
+        std::net::IpAddr::V4(ipv4) => ipv4,
+        _ => {
+            println!("Selected interface does not have an IPv4 address");
+            return;
+        }
+    };
 
-    for i in 1..=254 {
-        let target_ip = Ipv4Addr::new(192, 168, 1, i);
-        send_arp_request(interface_name, target_ip, source_ip, source_mac);
+    let base_ip = source_ip.octets();
+
+    for octet in 1..255 {
+        let target_ip = Ipv4Addr::new(base_ip[0], base_ip[1], base_ip[2], octet);
+        send_arp_request(interface.clone(), target_ip, source_ip, source_mac);
     }
+
 }
 
 pub fn list_interfaces() -> Vec<NetworkInterface> {
-    let available_interfaces = datalink::interfaces().iter().filter(|iface| {
-         !iface.ips.is_empty()
-    }).cloned().collect();
+    let available_interfaces = datalink::interfaces()
+        .iter()
+        .filter(|iface| !iface.ips.is_empty())
+        .cloned()
+        .collect();
     available_interfaces
 }
